@@ -8,8 +8,8 @@ import ldap_notify.utils as utils
 import ldap_notify.mail as mail
 
 def search_users(config, con, fltr=""):
-    attr_list = ["mail", "cn", config.notify_attribute, config.expiry_attribute, 'fullName', 'loginGraceRemaining']
-    fltr = "(&(objectClass=%s)(!(loginDisabled=true))%s)" % (config.user_objectclass, fltr)
+    attr_list = ["mail", "cn", config.notify_attribute, config.expiry_attribute, 'fullName']
+    fltr = "(&(objectClass=%s)%s)" % (config.user_objectclass, fltr)
     users = []
     for dn in (config.base_dn or ['']):
         log.info("Searching for %s at '%s'%s" % (fltr, dn, ' and its subtree' if config.subtree_search else ''))
@@ -45,7 +45,7 @@ def search_users_without_grace_logins(config, con):
 
 
 def users_for_rule(config, con, rule):
-    users = search_users(config, con, "(&(%s>=%s)(!(%s>=%s))(!(loginGraceRemaining=0)))" % (config.expiry_attribute, rule.start, config.expiry_attribute, rule.end))    
+    users = search_users(config, con, "(&(%s>=%s)(!(%s>=%s)))" % (config.expiry_attribute, rule.start, config.expiry_attribute, rule.end))    
     result = []
     for dn, ldap_user in users:
         # filter out those whose notify attribute shows a notification in less of the days of this rule
