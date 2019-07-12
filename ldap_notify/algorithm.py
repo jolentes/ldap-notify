@@ -8,7 +8,7 @@ import ldap_notify.utils as utils
 import ldap_notify.mail as mail
 
 def search_users(config, con, fltr=""):
-    attr_list = ["mail", "cn", config.notify_attribute, config.expiry_attribute, 'fullName']
+    attr_list = ["mail", "cn", config.expiry_attribute, 'fullName']
     fltr = "(&(objectClass=%s)%s)" % (config.user_objectclass, fltr)
     users = []
     for dn in (config.base_dn or ['']):
@@ -29,9 +29,7 @@ def ldap_user_to_user(config, cn, ldap_user):
         'loginGraceRemaining': None
     }
     for attr in ldap_user:
-        if attr==config.notify_attribute:
-            to_attr = 'notify'
-        elif attr==config.expiry_attribute:
+        if attr==config.expiry_attribute:
             to_attr = 'expiry'
         else:
             to_attr = attr
@@ -44,57 +42,53 @@ def search_users_without_grace_logins(config, con):
     return list(ldap_user_to_user(config, cn, ldap_user) for cn, ldap_user in users)
 
 
-def users_for_rule(config, con, rule):
+def users_for_rule(config, con, rule, notify_data):
     users = search_users(config, con, "(&(%s>=%s)(!(%s>=%s)))" % (config.expiry_attribute, rule.start, config.expiry_attribute, rule.end))    
     result = []
     for dn, ldap_user in users:
         # filter out those whose notify attribute shows a notification in less of the days of this rule
-        if config.notify_attribute in ldap_user:
-            try:
-                # check old notify attribute
-                if config.notify_attribute in ldap_user:
-                    notify_attribute_value = ldap_user[config.notify_attribute][0]
-                    parts = notify_attribute_value.split(':')                    
-                        
-                    def fix_user():
-                        log.warn("%sDeleting invalid attribute of %s: '%s: %s'" % ('DRY: ' if config.dry else 'TEST:' if config.test.enabled else '',
-                                                                                 dn, config.notify_attribute, notify_attribute_value))
-                        if not config.dry and not config.test.enabled:
-                            con.modify_s(dn, [
-                                (ldap.MOD_DELETE, config.notify_attribute, notify_attribute_value)
-                            ])
+        try:
+            # check old notify attribute
+            if dn in notify_data:
+                notify_attribute_value = notify_data[dn]
+                parts = notify_attribute_value.split(':')
 
-                    if len(parts) != 2:
+                def fix_user():
+                    log.warn("%sDeleting invalid notify value of %s: '%s'" % ('DRY: ' if config.dry else 'TEST:' if config.test.enabled else '',
+                                                                             dn, notify_attribute_value))
+                    if not config.dry and not config.test.enabled:
+                        del notify_data[dn]
+
+                if len(parts) != 2:
+                    fix_user()
+                else:
+                    # try notify attribute type conversion
+                    try:
+                        last_rule = int(parts[1])
+                        last_notify = datetime.strptime(parts[0], g.LDAP_TIME_FORMAT)
+                        expiry = datetime.strptime(ldap_user[config.expiry_attribute][0], g.LDAP_TIME_FORMAT)
+                    except TypeError:
                         fix_user()
                     else:
-                        # try notify attribute type conversion
-                        try:
-                            last_rule = int(parts[1])
-                            last_notify = datetime.strptime(parts[0], g.LDAP_TIME_FORMAT)
-                            expiry = datetime.strptime(ldap_user[config.expiry_attribute][0], g.LDAP_TIME_FORMAT)
-                        except TypeError:
-                            fix_user()
-                        else:                                
-                            # skip users without email: their notification is only sent once to the admins.
-                            # At this point this happened already.
-                            if 'mail' not in ldap_user:
-                                log.debug("Skipping %s because reminder %s was sent to admins before: %s" % (dn, last_rule, ldap_user[config.notify_attribute]))
-                                continue
-                                                    
-                            if not (expiry - last_notify >= timedelta(days=last_rule) or last_rule > rule.days):
-                                if g.DEBUG > 1:
-                                    log.debug("Skipping %s because reminder %s was sent before: %s" % (dn, last_rule, ldap_user[config.notify_attribute]))
-                                continue
-                    
-                # users without email will notify the admin later
-                if 'mail' not in ldap_user:
-                    log.info("User %s has no email" % dn)
-            except ValueError, e:
-                log.exception('Skipping %s because: %s' % (dn, str(e)))
-                continue
-            except Exception, e:
-                log.exception(e)
-                continue
+                        # skip users without email: their notification is only sent once to the admins.
+                        # At this point this happened already.
+                        if 'mail' not in ldap_user:
+                            log.debug("Skipping %s because reminder %s was sent to admins before: %s" % (dn, last_rule, notify_data[dn]))
+                            continue
+
+                        if not (expiry - last_notify >= timedelta(days=last_rule) or last_rule > rule.days):
+                            if g.DEBUG > 1:
+                                log.debug("Skipping %s because reminder %s was sent before: %s" % (dn, last_rule, notify_data[dn]))
+                            continue
+            # users without email will notify the admin later
+            if 'mail' not in ldap_user:
+                log.info("User %s has no email" % dn)
+        except ValueError, e:
+            log.exception('Skipping %s because: %s' % (dn, str(e)))
+            continue
+        except Exception, e:
+            log.exception(e)
+            continue
 
         log.debug('Found %s with %s=%s to be notified with rule %i' % (dn, config.expiry_attribute, ldap_user[config.expiry_attribute][0], rule.days))
         result.append(ldap_user_to_user(config, dn, ldap_user))
@@ -102,17 +96,15 @@ def users_for_rule(config, con, rule):
     return result
 
 
-def mark_user_notified(config, con, user, rule, restricted):
+def mark_user_notified(config, user, rule, restricted):
     marker = g.NOW.strftime(g.LDAP_TIME_FORMAT) + ':' + str(rule.days)
-    log.info('%sMarking user %s notified with %s' % ('RESTRICTED: ' if restricted else 'DRY: ' if config.dry else '', 
+    log.info('%sMarking user %s notified with %s' % ('RESTRICTED: ' if restricted else 'DRY: ' if config.dry else '',
                                                     user.cn, marker))
     if not restricted and not config.dry and not config.test.enabled:
-        con.modify_s(user.dn, [
-            (ldap.MOD_REPLACE, config.notify_attribute, marker)
-        ])
-    
+        log.debug('marking user %s' % user.cn)
+        return marker
 
-def notify_users(config, con, users, rule):
+def notify_users(config, notify_data, users, rule):
     mailer = mail.MailHandler(config)
     failed = []
     notified = []
@@ -120,10 +112,10 @@ def notify_users(config, con, users, rule):
         try:
             restricted = config.restrict_to_users and not (user.cn.lower() in config.restrict_to_users or user.dn.lower() in config.restrict_to_users)
             mailer.send_user_mail(rule, user, restricted)
-            mark_user_notified(config, con, user, rule, restricted)
+            notify_data[user.dn] = mark_user_notified(config, user, rule, restricted)
             notified.append(user)
         except Exception:
-            log.exception('Exception processing user %s' + user.cn)
+            log.exception('Exception processing user %s' % user.cn)
             failed.append(user)
     return notified, failed
 
@@ -145,6 +137,3 @@ def notify_admin(config, con, notified_users, failed_users, users_without_email,
     no_grace_logins_lines = list(user_to_rule_line(user, user.rule) for user in users_without_grace_logins)
     
     mailer.send_admin_report(config, notified_lines, failed_lines, without_email_lines, no_grace_logins_lines)
-            
-
-    

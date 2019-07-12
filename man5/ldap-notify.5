@@ -72,7 +72,7 @@ subtree_search = false
 starttls = false
 ignore_cert = false
 expiry_attribute = passwordExpirationTime
-notify_attribute = pwmNotify
+notify_file = /var/lib/account-expiry-notify/notified-users.json
 dry = false
 restrict_to_users =
 user_objectclass = person
@@ -128,8 +128,8 @@ Option	Format	Description	Examples
 \fB\fCstarttls\fR	boolean	use starttls on a ldap:// connection	true or false
 \fB\fCignore_cert\fR	boolean	don't check server SSL/TLS certificate	true or false
 \fB\fCexpiry_attribute\fR	LDAP attribute	the attribute holding the expiration timestamp	passwordExpirationTime
-\fB\fCnotify_attribute\fR	LDAP attribute	the attribute used to store sent notifications	pwmNotify
-\fB\fCdry\fR	boolean	don't send mails or modify LDAP	
+\fB\fCnotify_file\fR	string	file path to JSON file that sent notifications are stored in	/var/lib/account-expiry-notify/notified-users.json
+\fB\fCdry\fR	boolean	don't send mails or modify LDAP
 \fB\fCrestrict_to_users\fR	DN or CN list	restrict sent mail and LDAP modifications	\fB\fCcn=admin,ou=users,dc=localhost;root;hschmidt;\fR
 \fB\fCuser_objectclass\fR	LDAP objectClass	an object class name to restrict the user search	pwmUser or person
 \fB\fCobject\fR	string	the object this config talks about	password or login
@@ -370,13 +370,13 @@ have an email address,
 .IP \(bu 2
 have grace login available.
 .RE
-.SS Notify Attribute
+.SS Notify File
 .PP
-The algorithm stores the last sent notification and a timestamp in the \fB\fCnotify_attribute\fR (defined in the \fB\fCcommon\fR config section). The value has the following format:
+The algorithm stores the last sent notification and a timestamp in a JSON file (defined in the \fB\fCcommon\fR config section with parameter \fB\fCnotify_file\fR). The file has the following format:
 .PP
 .RS
 .nf
-20140116111356Z:30
+{ 'uid=johndoe,cn=users,dc=example,dc=com': '20140116111356Z:30' }
 .fi
 .RE
 .PP

@@ -34,7 +34,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(c.bind_password, 'root_secret')
         self.assertEqual(c.starttls, True)
         self.assertEqual(c.expiry_attribute, 'passwordExpirationTime')
-        self.assertEqual(c.notify_attribute, 'pwmNotify')
+        self.assertEqual(c.notify_file, '/var/lib/account-expiry-notify/notified-users.json')
         self.assertEqual(c.smtp.server, 'localhost')
         self.assertTrue(c.smtp.starttls)
         self.assertEqual(len(c.rules), 5)

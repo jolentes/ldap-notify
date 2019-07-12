@@ -5,6 +5,7 @@ import getopt
 import ConfigParser
 import ldap
 import locale
+import json
 from datetime import datetime
 from smtplib import SMTPException
 
@@ -46,25 +47,43 @@ def run(config):
 	import ldap_notify.algorithm as algorithm
 	if g.DEBUG > 5:
 		print repr(algorithm.search_users(config, con))
-	
+
+	notify_data = {}
+
+	# read notify_file
+	try:
+		with open(config.notify_file, 'r') as data_file:
+			notify_data = json.load(data_file)
+	except:
+		# File doesn't exist yet
+		log.info('notify_file %s not found!' % config.notify_file)
+
 	# process the rules, starting with the smallest interval
 	users_without_email = []
 	failed_users = []
 	notified_users = []
 	for rule in config.rules:
-		rule_users = algorithm.users_for_rule(config, con, rule)
+		rule_users = algorithm.users_for_rule(config, con, rule, notify_data)
 		
 		# assign rule
 		for user in rule_users:
 			setattr(user, 'rule', rule)
 		
 		# notify those which have an email
-		successful, failed = algorithm.notify_users(config, con, filter(lambda u: u.mail, rule_users), rule)
+		successful, failed = algorithm.notify_users(config, notify_data, filter(lambda u: u.mail, rule_users), rule)
 		notified_users.extend(successful)
 		failed_users.extend(failed)
 		
 		# collect all others for the admin
 		users_without_email.extend(filter(lambda u: not u.mail, rule_users))
+
+	try:
+		with open(config.notify_file, 'w') as data_file:
+			json.dump(notify_data, data_file)
+	except:
+		# Directory does not exist or no write permission
+		log.exception('Exception writing file %s' % config.notify_file)
+
 
 	# find users without graceLogins
 	users_without_grace_logins = algorithm.search_users_without_grace_logins(config, con)
