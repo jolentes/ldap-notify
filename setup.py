@@ -6,11 +6,11 @@ setup(name='ldap-notify',
 	description='LDAP Login/Password Email Notification Service',
 	version='0.9.6',
 	long_description="""\
-      `ldap-notify` searches users in an LDAP directory whose login or password expires in a certain number of days. These users are notified with a customizable email. The time intervals for the notifications and the email templates can be freely defined. By using a custom LDAP attribute the last notification is stored in the directory such that users are only notified once per rule. Moreover, this mechanism allows running the tool (e.g. via cron) on multiple machine with a certain time delta in order to implement high availabiliy. 
+      `ldap-notify` searches users in an Univention Corporate Server LDAP directory whose login or password expires in a certain number of days. These users are notified with a customizable email. The time intervals for the notifications and the email templates can be freely defined. By using a custom LDAP attribute the last notification is stored in the directory such that users are only notified once per rule. Moreover, this mechanism allows running the tool (e.g. via cron) on multiple machine with a certain time delta in order to implement high availabiliy. 
       """,
-    author='Dr. Stefan Schimanski',
-    author_email='stefan.schimanski@gmail.com',
-    url='https://github.com/sttts/ldap_notify',
+    author='Joern Lentes',
+    author_email='joern.lentes@web.de',
+    url='https://github.com/jolentes/ldap_notify',
     packages=['ldap_notify'],
     package_data = {'ldap_notify': ['templates/*']},
     scripts=[ 'scripts/ldap-notify' ],
@@ -20,7 +20,7 @@ setup(name='ldap-notify',
 	  	"Development Status :: 4 - Beta",
 	  	"Topic :: System :: Systems Administration :: Authentication/Directory :: LDAP"
 	],
-	keywords='ldap notification eDirectory',
+	keywords='ldap notification univention',
 	license='GPL',
 	install_requires=[
 		'python-ldap',
