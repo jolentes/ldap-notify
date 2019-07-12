@@ -83,7 +83,7 @@ subtree_search = false
 starttls = false
 ignore_cert = false
 expiry_attribute = passwordExpirationTime
-notify_attribute = pwmNotify
+notify_file = /var/lib/account-expiry-notify/notified-users.json
 dry = false
 restrict_to_users =
 user_objectclass = person
@@ -125,7 +125,7 @@ The configuration options have the following meaning:
 | `starttls` | boolean | use starttls on a ldap:// connection | true or false |
 | `ignore_cert` | boolean | don't check server SSL/TLS certificate | true or false |
 | `expiry_attribute` | LDAP attribute | the attribute holding the expiration timestamp | passwordExpirationTime |
-| `notify_attribute` | LDAP attribute | the attribute used to store sent notifications | pwmNotify |
+| `notify_file` | string | file path to JSON file that sent notifications are stored in | /var/lib/account-expiry-notify/notified-users.json |
 | `dry` | boolean | don't send mails or modify LDAP |
 | `restrict_to_users` | DN or CN list | restrict sent mail and LDAP modifications | `cn=admin,ou=users,dc=localhost;root;hschmidt;` |
 | `user_objectclass` | LDAP objectClass | an object class name to restrict the user search | pwmUser or person |
@@ -299,12 +299,12 @@ In addition in case of any of the following conditions only the admin is notifie
 - have an email address,
 - have grace login available.
 
-### Notify Attribute
+### Notify File
 
-The algorithm stores the last sent notification and a timestamp in the `notify_attribute` (defined in the `common` config section). The value has the following format:
+The algorithm stores the last sent notification and a timestamp in a JSON file (defined in the `common` config section with parameter `notify_file`). The file has the following format:
 
 ```
-20140116111356Z:30
+{ 'uid=johndoe,cn=users,dc=example,dc=com': '20140116111356Z:30' }
 ```
 
 It tells the algorithm that this user was notified at the given timestamp with a 30 days rule.

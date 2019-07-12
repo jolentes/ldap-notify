@@ -23,6 +23,7 @@ base_dn =
 subtree_search = false 
 expiry_attribute = passwordExpirationTime
 notify_attribute = pwmNotify
+notify_file = /var/lib/account-expiry-notify/notified-users.json
 dry = false
 restrict_to_users =
 user_objectclass = person
@@ -84,6 +85,7 @@ def evaluate(config):
     c['subtree_search'] = config.getboolean("common", "subtree_search") or c['base_dn'] == []
     c['expiry_attribute'] = config.get("common", "expiry_attribute").strip() or None
     c['notify_attribute'] = config.get("common", "notify_attribute").strip() or None
+    c['notify_file'] = config.get("common", "notify_file").strip() or None
     c['user_objectclass'] = config.get("common", "user_objectclass").strip() or None
     c['dry'] = config.getboolean("common", "dry")
     c['restrict_to_users'] = set(dn_list_parse(config.get("common", "restrict_to_users", "").strip().lower()))
